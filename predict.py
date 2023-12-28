@@ -13,14 +13,20 @@ import matplotlib.pyplot as plt
 parser = argparse.ArgumentParser(description="Predict flower name from an image.")
 parser.add_argument('input', type=str, help='Image path')
 parser.add_argument('checkpoint', type=str, help='Checkpoint file path')
+parser.add_argument('--arch', type=str, help='Model architecture', default='vgg16')
 parser.add_argument('--top_k', type=int, default=5, help='Return top K most likely classes')
 parser.add_argument('--category_names', type=str, default='cat_to_name.json', help='Path to JSON file mapping categories to real names')
 parser.add_argument('--gpu', action='store_true', help='Use GPU for inference')
 
 args = parser.parse_args()
+arch = args.arch
 
-# Check for GPU availability
-device = torch.device("cuda" if args.gpu and torch.cuda.is_available() else "cpu")
+gpu = args.gpu
+if gpu == True
+    device = torch.device('cuda' if gpu and torch.cuda.is_available() else 'cpu')
+else:
+    device = torch.device('cpu')
+print('Device: ',device)
 
 def process_image(image_path):
     # Load the image
@@ -55,7 +61,10 @@ def load_checkpoint(filepath):
     checkpoint = torch.load(filepath, map_location=device)
 
     # Initialize the pre-trained model
-    model = models.vgg16(pretrained=True) if 'vgg16' == checkpoint['arch'] else None
+    if arch == 'VGG':
+        model = models.vgg16(pretrained=True) if 'vgg16' == checkpoint['arch'] else None
+    elif arch == 'Densenet':
+        model = models.densenet121(pretrained=True) if 'densenet' == checkpoint['arch'] else None
     if model is None:
         print("Architecture not recognized.")
         return None
@@ -70,7 +79,7 @@ def load_checkpoint(filepath):
 
 # Load category names
 with open(args.category_names, 'r') as f:
-    cat_to_name = json.load(f)
+    cat_to_name = json.load(f, strict=False)
 
 # Load the model
 model = load_checkpoint(args.checkpoint)

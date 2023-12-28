@@ -11,29 +11,58 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 from torch.utils.data import DataLoader
 
+parser = argparse.ArgumentParser(description='Train a neural network on a dataset.')
 
+parser.add_argument('data_directory', type=str, help='Directory of the data set')
+parser.add_argument('--save_dir', type=str, help='Directory to save checkpoints', default='.')
+parser.add_argument('--arch', type=str, help='Model architecture', default='vgg16')
+parser.add_argument('--learning_rate', type=float, help='Learning rate', default=0.001)
+parser.add_argument('--hidden_units', type=int, help='Number of hidden units', default=512)
+parser.add_argument('--epochs', type=int, help='Number of epochs', default=20)
+parser.add_argument('--gpu', action='store_true', help='Use GPU for training', default=True)
+
+args = parser.parse_args()
+
+data_dir = args.data_directory
+save_dir = args.save_dir
+arch = args.arch
+lr = args.learning_rate
+hidden_units = args.hidden_units
+epochs = args.epochs
+gpu = args.gpu
+if gpu == True
+    device = torch.device('cuda' if gpu and torch.cuda.is_available() else 'cpu')
+else:
+    device = torch.device('cpu')
+print('Device: ',device)
 def build_model(arch='vgg16', hidden_units=512, learning_rate=0.001, gpu=False):
     if arch not in ['vgg16', '<other_archs>']:
         raise ValueError('Unsupported architecture.')
 
-    # Load pre-trained model
-    if arch == 'vgg16':
+    if arch == 'VGG':
         model = models.vgg16(pretrained=True)
-  
-    model = models.vgg16(pretrained=True)
 
-    # Freeze parameters so we don't backprop through them
-    for param in model.parameters():
-        param.requires_grad = False
+        for param in model.parameters():
+            param.requires_grad = False
+        classifier = nn.Sequential(
+            nn.Linear(25088, 4096),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(4096, 102),
+            nn.LogSoftmax(dim=1)
+        )
 
-    # Define a new, untrained feed-forward network as a classifier
-    classifier = nn.Sequential(
-        nn.Linear(25088, 4096),
-        nn.ReLU(),
-        nn.Dropout(0.5),
-        nn.Linear(4096, 102),
-        nn.LogSoftmax(dim=1)
-    )
+    elif arch == 'Densenet':
+        model = models.densenet121(pretrained=True)
+        # Only train the classifier parameters, feature parameters are frozen
+        for param in model.parameters():
+            param.requires_grad = False
+        classifier = nn.Sequential(nn.Linear(1024, 4096),
+                        nn.ReLU(),
+                        nn.Dropout(0.5),
+                        nn.Linear(4096, 102),
+                        nn.LogSoftmax(dim=1)
+                    )
 
     model.classifier = classifier
 
@@ -41,7 +70,7 @@ def build_model(arch='vgg16', hidden_units=512, learning_rate=0.001, gpu=False):
     optimizer = optim.Adam(model.classifier.parameters(), lr=learning_rate)
 
     # Use GPU if it's available and "gpu" flag is True
-    device = torch.device('cuda' if gpu and torch.cuda.is_available() else 'cpu')
+    
     model.to(device)
 
     return model, optimizer, criterion
@@ -98,18 +127,16 @@ def train_model(model, optimizer, criterion, epochs, dataloaders, use_gpu):
     steps = 0
     running_loss = 0
     print_every = 5
-    # Move the model to the appropriate device (CPU or GPU)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
     for epoch in range(epochs):
         for inputs, labels in dataloaders['train']:
             steps += 1
-            inputs, labels = inputs.to('cuda'), labels.to('cuda')
+            inputs, labels = inputs.to(device), labels.to(device)
 
             optimizer.zero_grad()
 
-            outputs = model.forward(inputs)
+            outputs = model(inputs)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
@@ -123,7 +150,7 @@ def train_model(model, optimizer, criterion, epochs, dataloaders, use_gpu):
                 with torch.no_grad():
                     for inputs, labels in dataloaders['valid']:
                         inputs, labels = inputs.to('cuda'), labels.to('cuda')
-                        outputs = model.forward(inputs)
+                        outputs = model(inputs)
                         batch_loss = criterion(outputs, labels)
 
                         test_loss += batch_loss.item()
@@ -141,26 +168,7 @@ def train_model(model, optimizer, criterion, epochs, dataloaders, use_gpu):
                 running_loss = 0
                 model.train()
 def main():
-    parser = argparse.ArgumentParser(description='Train a neural network on a dataset.')
-
-    parser.add_argument('data_directory', type=str, help='Directory of the data set')
-    parser.add_argument('--save_dir', type=str, help='Directory to save checkpoints', default='.')
-    parser.add_argument('--arch', type=str, help='Model architecture', default='vgg16')
-    parser.add_argument('--learning_rate', type=float, help='Learning rate', default=0.01)
-    parser.add_argument('--hidden_units', type=int, help='Number of hidden units', default=512)
-    parser.add_argument('--epochs', type=int, help='Number of epochs', default=20)
-    parser.add_argument('--gpu', action='store_true', help='Use GPU for training')
-
-    args = parser.parse_args()
-
-    data_dir = args.data_directory
-    save_dir = args.save_dir
-    arch = args.arch
-    lr = args.learning_rate
-    hidden_units = args.hidden_units
-    epochs = args.epochs
-    gpu = args.gpu
-
+    
     # Load and transform the dataset
     dataloaders, image_datasets = load_data(data_dir)
     
